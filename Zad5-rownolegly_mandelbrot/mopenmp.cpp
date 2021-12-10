@@ -5,23 +5,59 @@
 #include <chrono>
 #include <omp.h>
 
-#define T 6
-
 using namespace std;
 
-const int iXmax = 5000;
-const int iYmax = 5000;
-const double CxMin = -2.5;
-const double CxMax = 1.5;
-const double CyMin = -2.0;
-const double CyMax = 2.0;
-const int IterationMax = 200;
-const double EscapeRadius = 2;
+const int iXmax     = 5000;
+const int iYmax     = 5000;
+const double CxMin  = -2.5;
+const double CxMax  = 1.5;
+const double CyMin  = -2.0;
+const double CyMax  = 2.0;
+const int IterationMax      = 200;
+const double EscapeRadius   = 2;
 const int MaxColorComponentValue = 255;
 unsigned char color[iYmax][iXmax][3];
 
-int main()
+void set_color(int id, int iY, int iX, bool is_exterior) {
+    switch(id) {
+        case 0:
+            color[iY][iX][0] = 255;
+            color[iY][iX][1] = 255;
+            color[iY][iX][2] = 0 + (is_exterior*100);
+            break;
+
+        case 1:
+            color[iY][iX][0] = 0 + (is_exterior*100);
+            color[iY][iX][1] = 0 + (is_exterior*100);
+            color[iY][iX][2] = 255;
+            break;
+
+        case 2:
+            color[iY][iX][0] = 0 + (is_exterior*100);
+            color[iY][iX][1] = 255;
+            color[iY][iX][2] = 0 + (is_exterior*100);
+            break;
+
+        case 3:
+            color[iY][iX][0] = 255;
+            color[iY][iX][1] = 0 + (is_exterior*100);
+            color[iY][iX][2] = 0 + (is_exterior*100);
+            break;
+        }
+}
+
+int main(int argc, char *argv[]) // run with: g++ -pthread -lgomp -fopenmp mopenmp.cpp -O3
 {
+    int THREADS;
+    if(argc == 2) {
+        THREADS = std::stoi(argv[1]);
+    }
+    else {
+        std::cout << "usage: command <num_of_threads>" << std::endl;
+        exit(1);
+    }
+    
+
     int iX, iY;
     double Cx, Cy;
     double Zx, Zy;
@@ -38,14 +74,14 @@ int main()
     fp = fopen(filename, "wb");
     fprintf(fp, "P6\n %s\n %d\n %d\n %d\n", comment, iXmax, iYmax, MaxColorComponentValue);
     int iter[4] = {0};
-    omp_set_num_threads(T);
+    omp_set_num_threads(THREADS);
 #pragma omp parallel private(id)
     {
         float start, end;
         start = omp_get_wtime();
         id = omp_get_thread_num();
 
-#pragma omp for schedule(static, 10) nowait
+#pragma omp for //schedule(static, 10) nowait
         for (iY = 0; iY < iYmax; iY++)
         {
             Cy = CyMin + iY * PixelHeight;
@@ -71,40 +107,11 @@ int main()
                 /* compute  pixel color (24 bit = 3 bytes) */
                 if (Iteration == IterationMax)
                 {
-                    /*  interior of Mandelbrot set = black */
-                    switch(id) {
-                        case 0:
-                            color[iY][iX][0] = 180;
-                            color[iY][iX][1] = 0;
-                            color[iY][iX][2] = 255;
-                            break;
-
-                        case 1:
-                            color[iY][iX][0] = 0;
-                            color[iY][iX][1] = 50;
-                            color[iY][iX][2] = 255;
-                            break;
-
-                        case 2:
-                            color[iY][iX][0] = 0;
-                            color[iY][iX][1] = 255;
-                            color[iY][iX][2] = 70;
-                            break;
-
-                        case 3:
-                            color[iY][iX][0] = 255;
-                            color[iY][iX][1] = 0;
-                            color[iY][iX][2] = 0;
-                            break;
-                    }
-                    
+                    set_color(id, iY, iX, 0);   
                 }
                 else
                 {
-                    /* exterior of Mandelbrot set = white */
-                    color[iY][iX][0] = 255; /* Red*/
-                    color[iY][iX][1] = 255; /* Green */
-                    color[iY][iX][2] = 255; /* Blue */
+                    set_color(id, iY, iX, 1);
                 };
                 /*write color to the file*/
             }
@@ -114,7 +121,7 @@ int main()
     }
 
     for(int i = 0; i < 4; i++) {
-        std::cout << iter[i] << std::endl;
+        std::cout << "Thread " << i << " " << iter[i] << " iterations" << std::endl;
     }
 
     fwrite(color, 1, 3 * iYmax * iXmax, fp);
