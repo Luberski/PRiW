@@ -1,0 +1,21 @@
+8 Poziomów
+4096x4096
+po 10 wywołań
+
+2 THREADS
+task_if = true
+~181.109ms
+task_if = false
+~171.153ms
+
+4 THREADS
+task_if = true
+~183.395ms
+task_if = false
+~187.547ms
+
+Taski przyspieszają wykonanie
+Klauzula if nie optymalizuje
+
+
+
