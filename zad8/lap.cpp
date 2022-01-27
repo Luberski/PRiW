@@ -5,8 +5,9 @@
 
 using namespace std;
 
-const int size = 500;
+const int size = 1024 * 2;
 char pixels[size][size][3];
+unsigned int Seed;
 
 class Lapunov
 {
@@ -51,11 +52,12 @@ public:
 		  }
 		}*/
 
-	void Draw(float Seed, int NoIter, int RozX, int RozY, int start, int koniec, float RXMin, float RXMax, float RYMin, float RYMax, int val, int s)
+	void Draw(unsigned int Seed, int NoIter, int RozX, int RozY, int start, int koniec, float RXMin, float RXMax, float RYMin, float RYMax, int val, int s)
 	{
 		float rx, ry, deltaX, deltaY, tmpLap = 0;
 		int k, w;
 		char tmp;
+		int id;
 
 		for (k = 0; k < 16; k++)
 			Sequence[k] = 0;
@@ -72,13 +74,13 @@ public:
 		deltaX = (MaxR - MinR) / RozX;
 		deltaY = (MaxX - MinX) / RozY;
 		rx = MinR;
-		ry = MaxX - (start - 1) * deltaY;
+		int ry_start = MaxX - (start - 1) * deltaY;
 		double z;
 		for (k = 0; k < 15; k++)
 			std::cout << (int)Sequence[k];
 
 		std::cout << "\n";
-#pragma omp parrarel for
+#pragma omp parallel for private(k)
 		for (w = 0; w < RozY; w++)
 		{
 			for (k = 0; k < RozX; k++)
@@ -100,22 +102,24 @@ public:
 					pixels[k][w][1] = 0;
 					pixels[k][w][2] = 0;
 				}
-				rx = rx + deltaX;
+				rx = MinR + deltaX; // //rx = rx + deltaX;
+				ry = ry_start - deltaY * w;
+				
 			}
-			rx = MinR;
-			ry = ry - deltaY;
+			//rx = MinR;
+			
 		}
 		//return pixels;
 	}
 
-	float ValLap(float Seed, int NoIter, float rx, float ry)
+	float ValLap(unsigned int Seed, int NoIter, float rx, float ry)
 	{
 
 		float x, sumlap, elem, ValLap;
 		int i, poz, NoElem;
 		float R;
 
-		x = Seed; // randr tu ogarnąć
+		x = rand_r(&Seed); // randr tu ogarnąć
 		sumlap = 0;
 		NoElem = 0;
 		poz = 0;
@@ -189,6 +193,7 @@ int main(int argc, char *argv[]) // run with: g++ -lgomp -fopenmp mopenmp.cpp -O
 {
 
 	int THREADS;
+
 	if (argc == 2)
 	{
 		THREADS = stoi(argv[1]);
@@ -201,13 +206,6 @@ int main(int argc, char *argv[]) // run with: g++ -lgomp -fopenmp mopenmp.cpp -O
 
 	omp_set_num_threads(THREADS);
 
-	using std::chrono::duration;
-	using std::chrono::duration_cast;
-	using std::chrono::high_resolution_clock;
-	using std::chrono::milliseconds;
-
-	auto t1 = high_resolution_clock::now();
-
 	FILE *fp;
 	int i, j;
 	char *filename = "new1.ppm";
@@ -218,22 +216,19 @@ int main(int argc, char *argv[]) // run with: g++ -lgomp -fopenmp mopenmp.cpp -O
 	fp = fopen(filename, "wb"); /* b -  binary mode */
 	/*write ASCII header to the file*/
 
+	double t_start = omp_get_wtime();
+
 	fprintf(fp, "P6\n %s\n %d\n %d\n %d\n", comment, size, size, MaxColorComponentValue);
 
-	#pragma omp parallel 
-	{
-		lp.Draw(5, 100, size, size, 0, size, -3, 9, -5, 2, 2477, 1);
-	}
-	
+	srand(Seed);
+	lp.Draw(Seed, 100, size, size, 0, size, -3, 9, -5, 2, 2477, 1);
+
+	double t_end = omp_get_wtime();
+	printf("Total time: %f s\n", (t_end - t_start));
 
 	fwrite(pixels, 1, 3 * size * size, fp);
 
 	fclose(fp);
-
-	auto t2 = high_resolution_clock::now();
-
-	duration<double, std::milli> ms_double = t2 - t1;
-	std::cout << ms_double.count() << "ms";
 
 	return 0;
 }
